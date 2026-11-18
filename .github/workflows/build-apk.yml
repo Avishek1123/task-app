@@ -17,7 +17,39 @@ jobs:
         run: |
           sed -i 's#</manifest>#<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/><uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/></manifest>#' android/app/src/main/AndroidManifest.xml
       - run: npx cap sync android
-      - run: chmod +x android/gradlew && cd android && ./gradlew assembleDebug
+      - name: Build debug APK
+        run: |
+          mkdir -p ~/.gradle
+          printf '%s\n' \
+            'org.gradle.daemon=false' \
+            'systemProp.org.gradle.internal.repository.max.retries=8' \
+            'systemProp.org.gradle.internal.repository.initial.backoff=2000' \
+            'systemProp.org.gradle.internal.http.connectionTimeout=120000' \
+            'systemProp.org.gradle.internal.http.socketTimeout=120000' \
+            > ~/.gradle/gradle.properties
+          cat > ~/.gradle/init.gradle << 'EOF'
+          allprojects {
+            buildscript {
+              repositories {
+                maven { url 'https://maven-central.storage-download.googleapis.com/maven2' }
+                maven { url 'https://maven.google.com' }
+              }
+            }
+            repositories {
+              maven { url 'https://maven-central.storage-download.googleapis.com/maven2' }
+              maven { url 'https://maven.google.com' }
+            }
+          }
+          EOF
+          chmod +x android/gradlew
+          cd android
+          n=0
+          until ./gradlew assembleDebug --no-daemon; do
+            n=$((n+1))
+            if [ "$n" -ge 3 ]; then exit 1; fi
+            echo "Gradle failed (often a Maven rate limit). Retry $n in 25s"
+            sleep 25
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: NQT-Daily-APK
