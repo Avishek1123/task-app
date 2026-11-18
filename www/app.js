@@ -47,12 +47,61 @@ const isAssessedDrill = text => {
   if (/redo|wrong|skipped|weak topic/i.test(t)) return false;
   return /(aptitude|reasoning|\bquant\b)/i.test(t) && /\bq/i.test(t);
 };
-const visibleTasks = i => material(i).k.map((text, j) => ({ text, j })).filter(x => !isAssessedDrill(x.text));
-const quizOf = (i, id) => GEN.quiz(id, ds(dateOf(i)), i);
+const isCodeTask = t => {
+  if (/^(aptitude|verbal)\b/.test(t)) return false;
+  if (/quant|reasoning sprint|grammar|sentence|email|passage|formula|game plan|takeaway|sleep|proper rest|sectional|foundation part|foundation mock/.test(t)) return false;
+  return /^(solve:|problem \d|harder variant|speed re-solve)/.test(t)
+    || /re-solve|warm-up problem|coding problem|extra problem|gauntlet|advanced coding|test cases|weakest dsa|weakest problem type|unseen problem|stay warm|easy \+ 1 medium|1 easy \+ 1 medium/.test(t);
+};
+const activityKind = text => {
+  const t = cleanTask(text).toLowerCase();
+  if (isCodeTask(t)) return 'code';
+  if (/takeaway/.test(t)) return 'note';
+  if (/email/.test(t)) return 'email';
+  if (/passage recall|rewrite from memory/.test(t)) return 'recall';
+  if (/verbal|grammar q|sentence completion|para jumble|reading comprehension|full verbal/.test(t)) return 'verbal';
+  if (/sleep|proper rest|pack up/.test(t)) return 'rest';
+  if (/game plan|study today|read formula|mistake checklist once/.test(t)) return 'study';
+  if (/verify slot|re-check exam/.test(t)) return 'check';
+  if (/aptitude|quant|reasoning|sectional|mixed q|\d+\s*qs|foundation|sprint:/.test(t)) return 'quiz';
+  return 'write';
+};
+const quizKey = text => {
+  const t = cleanTask(text).toLowerCase();
+  if (/verbal|grammar|sentence|jumble|comprehension|full verbal/.test(t)) return 'ver';
+  if (/quant \+ reasoning \+ verbal|foundation/.test(t)) return 'mix';
+  if (/reasoning|seating|syllogism|puzzle|blood|coding-decoding|direction/.test(t) && !/quant/.test(t)) return 'rea';
+  return 'apt';
+};
+const pieces = i => {
+  const rows = material(i).k.map((text, j) => ({ text, j, kind: activityKind(text) }));
+  return {
+    app: rows.filter(r => r.kind !== 'code' && !isAssessedDrill(r.text)),
+    code: rows.filter(r => r.kind === 'code')
+  };
+};
+const quizOf = (i, id) => {
+  const date = ds(dateOf(i));
+  if (id === 'mix') return [...GEN.quiz('apt', date, i).slice(0, 4), ...GEN.quiz('rea', date, i).slice(0, 4), ...GEN.quiz('ver', date, i).slice(0, 4)];
+  return GEN.quiz(id, date, i);
+};
 const quizAns = (i, id) => (st().quiz && st().quiz[i] && st().quiz[i][id]) || [];
 const quizDone = (i, id) => { const qs = quizOf(i, id), a = quizAns(i, id); return a.length === qs.length && qs.length > 0 && a.every(x => x != null); };
-const doneN = i => visibleTasks(i).filter(x => (st().done[i] || [])[x.j]).length + (quizDone(i, 'apt') ? 1 : 0) + (quizDone(i, 'rea') ? 1 : 0);
-const slotN = i => visibleTasks(i).length + 2;
+const workOf = (i, j) => (st().work && st().work[i] && st().work[i][j]) || '';
+const words = s => s.trim().split(/\s+/).filter(Boolean).length;
+const rowDone = (i, row) => {
+  if (row.kind === 'verbal' || row.kind === 'quiz') return quizDone(i, quizKey(row.text));
+  if (row.kind === 'note') return workOf(i, row.j).trim().length >= 40;
+  if (row.kind === 'email') return words(workOf(i, row.j)) >= 80;
+  if (row.kind === 'recall' || row.kind === 'write') return workOf(i, row.j).trim().length >= 20;
+  if (row.kind === 'check') return workOf(i, row.j) === '111';
+  return !!(st().done[i] || [])[row.j];
+};
+const doneN = i => {
+  const { app, code } = pieces(i);
+  return (quizDone(i, 'apt') ? 1 : 0) + (quizDone(i, 'rea') ? 1 : 0) + app.filter(r => rowDone(i, r)).length + code.filter(r => !!(st().done[i] || [])[r.j]).length;
+};
+const slotN = i => { const { app, code } = pieces(i); return 2 + app.length + code.length; };
 const allDone = i => slotN(i) > 0 && doneN(i) === slotN(i);
 const groups = () => {
   const g = pack().phases.map(p => ({ n: p.n, a: p.a - 1, b: p.b - 1 }));
@@ -105,6 +154,22 @@ const tic = {
   moon: '<svg viewBox="0 0 24 24"><path d="M21 14.5A8.5 8.5 0 1 1 9.5 3 7 7 0 0 0 21 14.5z"/></svg>',
   list: '<svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg>'
 };
+const FORMULAS = [
+  'Percent: part = percent/100 × whole. Increase by r% → × (100+r)/100.',
+  'Profit% = profit/CP × 100. SP = CP × (100 ± profit or loss%)/100.',
+  'SI = P×R×T/100. CI = P(1+R/100)^T − P.',
+  'Together work: 1/A + 1/B. Pipes fill minus leak.',
+  'Speed = distance/time. km/h × 5/18 = m/s. Average speed = 2ab/(a+b) for equal distances.',
+  'Ratio a:b of T → shares aT/(a+b) and bT/(a+b).',
+  'Average: sum/n. New average after adding x: (old sum + x)/(n+1).',
+  'P&C: nPr = n!/(n−r)!. nCr = n!/(r!(n−r)!). Probability = favourable/total.'
+];
+const PASSAGES = [
+  { t: 'The night shift', b: 'Ravi reached the lab after the last bus had gone. The corridor lights were half off, and the only sound was the server fan. He opened the notebook from the morning class, copied one formula, and checked it against the sample. By the time the watchman knocked, the page was full and the doubt was gone.' },
+  { t: 'A small market', b: 'The stall sold only two things, tea and bananas. Meera counted the coins twice before she paid, because the vendor never returned change unless asked. She took the tea standing up, watched the buses, and left the banana for the ride home. It was the same stop she had used since her first week in the city.' },
+  { t: 'The exam hall', b: 'The invigilator asked for the admit card before anyone sat down. Ananya placed her ID on the desk, wrote her name on the rough sheet, and read the first question without touching the pen. She skipped two items, returned to them at the end, and still had four minutes when the bell rang.' },
+  { t: 'Rain on the platform', b: 'The train was late by twenty minutes, and the platform roof leaked above the third bench. Arun moved his bag, opened a chapter on ratios, and solved six questions before the announcement. When the train came he boarded the second coach, still holding the pencil.' }
+];
 function taskIcon(text) {
   const t = cleanTask(text).toLowerCase();
   if (/sleep|rest/.test(t)) return tic.moon;
@@ -122,8 +187,29 @@ function quizLabel(i, id) {
   return `${qs.length} questions · answer here, then check`;
 }
 function drillHint(i, id) {
-  const line = material(i).k.map(cleanTask).find(t => id === 'apt' ? /aptitude|\bquant\b/i.test(t) : /reasoning/i.test(t));
-  return line || (id === 'apt' ? 'Percentages, profit, time, interest, averages' : 'Series, coding-decoding, directions, blood relations');
+  const line = material(i).k.map(cleanTask).find(t => id === 'ver' ? /verbal|grammar|sentence|jumble/i.test(t) : id === 'rea' ? /reasoning/i.test(t) : /aptitude|\bquant\b/i.test(t));
+  return line || (id === 'ver' ? 'Sentence completion, grammar, synonyms and idioms' : id === 'rea' ? 'Series, coding-decoding, directions, blood relations' : id === 'mix' ? 'Numerical, reasoning and verbal together' : 'Percentages, profit, time, interest, averages');
+}
+function rowStatus(i, row) {
+  if (row.kind === 'verbal' || row.kind === 'quiz') return quizLabel(i, quizKey(row.text));
+  if (rowDone(i, row)) return 'Done here';
+  if (row.kind === 'study') return 'Read it here';
+  if (row.kind === 'note') return 'Write the 3 lines here';
+  if (row.kind === 'email') return 'Write the email here';
+  if (row.kind === 'recall') return 'Read, hide, rewrite';
+  if (row.kind === 'rest') return 'Mark it when you stop';
+  if (row.kind === 'check') return 'Tick the checklist here';
+  return 'Write it here';
+}
+function rowHref(i, row) {
+  if (row.kind === 'verbal' || row.kind === 'quiz') return `#/quiz/${quizKey(row.text)}/${i + 1}`;
+  return `#/work/${i + 1}/${row.j}`;
+}
+function writeStatus(kind, v) {
+  if (kind === 'email') return `${words(v)} words · 80 marks it done`;
+  if (kind === 'note') return `${v.trim().length} characters · 40 marks it done`;
+  if (kind === 'recall') return v.trim().length >= 20 ? 'Saved. This counts as done.' : 'Rewrite at least a few lines.';
+  return v.trim().length >= 20 ? 'Saved. This counts as done.' : 'Write a few lines. It saves on this phone.';
 }
 
 function planSwitch() {
@@ -131,7 +217,7 @@ function planSwitch() {
 }
 
 function vToday(i, fromList) {
-  const off = todayOff(), total = totalDays(), day = material(i), tasks = visibleTasks(i), c = doneN(i), slots = slotN(i);
+  const off = todayOff(), total = totalDays(), day = material(i), { app: appRows, code } = pieces(i), c = doneN(i), slots = slotN(i);
   const circ = 2 * Math.PI * 32, offRing = circ * (1 - c / slots);
   const when = dateOf(i);
   const hr = new Date().getHours();
@@ -143,19 +229,19 @@ function vToday(i, fromList) {
   const back = fromList ? `<a class="back" href="#/days">${ico.back} All days</a>` : '';
   return `${back}<div class="top"><div><p class="mu sm">${when.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}</p><h1>${isToday ? (hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening') : 'Day ' + (i + 1)}</h1></div><span class="chip">${ico.fire}${streak()} day${streak() === 1 ? '' : 's'}</span></div>
   <div class="card hero"><div class="ring"><svg width="76" height="76"><circle cx="38" cy="38" r="32" fill="none" stroke="var(--sf2)" stroke-width="7"/><circle cx="38" cy="38" r="32" fill="none" stroke="var(--lime)" stroke-width="7" stroke-linecap="round" stroke-dasharray="${circ}" stroke-dashoffset="${offRing}"/></svg><b>${c}/${slots}</b></div>
-  <div><p class="mu sm">${esc(pack().name)} · ${esc(phaseOf(i))}</p><h2>Day ${i + 1} — ${esc(day.t)}</h2><p class="mu sm">${c === slots ? 'All done for this day.' : 'Finish the tasks and both assessments.'}</p></div></div>
+  <div><p class="mu sm">${esc(pack().name)} · ${esc(phaseOf(i))}</p><h2>Day ${i + 1} — ${esc(day.t)}</h2><p class="mu sm">${c === slots ? 'All done for this day.' : 'Everything except coding is done inside the app.'}</p></div></div>
   ${banner}
   ${S.notify ? '' : `<a class="card" href="#/settings" style="display:flex;justify-content:space-between;align-items:center;background:var(--soft);border-color:transparent;margin-top:12px"><span class="sm"><b>Turn on the daily reminder</b><br><span class="mu">It names today's topic until the day is finished.</span></span></a>`}
   <p class="sec">Focus</p>
   <div class="note" style="margin-top:0">${esc(day.f)}</div>
   <p class="sec">Study</p>
   <div class="card"><ul class="pts">${day.s.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>
-  <p class="sec">Daily assessment</p>
+  <p class="sec">Do it here</p>
   <a class="card task ${quizDone(i, 'apt') ? 'done' : ''}" href="#/quiz/apt/${i + 1}"><span class="tic">${tic.calc}</span><span class="tt"><b>Aptitude</b><span>${esc(quizLabel(i, 'apt'))}</span></span></a>
   <a class="card task ${quizDone(i, 'rea') ? 'done' : ''}" href="#/quiz/rea/${i + 1}"><span class="tic">${tic.reason}</span><span class="tt"><b>Reasoning</b><span>${esc(quizLabel(i, 'rea'))}</span></span></a>
-  <p class="sec">Tasks</p>
-  ${tasks.map(({ text, j }) => { const on = !!(st().done[i] || [])[j]; return `<button class="check ${on ? 'on' : ''}" data-act="tog" data-i="${i}" data-j="${j}"><span class="box">${on ? ico.tick : ''}</span><span class="tic">${taskIcon(text)}</span><span>${esc(cleanTask(text))}</span></button>`; }).join('')}
-  <textarea data-note="${i}" placeholder="3-line takeaway (saved on this device)">${esc(st().notes[i] || '')}</textarea>
+  ${appRows.map(row => `<a class="card task ${rowDone(i, row) ? 'done' : ''}" href="${rowHref(i, row)}"><span class="tic">${taskIcon(row.text)}</span><span class="tt"><b>${esc(cleanTask(row.text))}</b><span>${esc(rowStatus(i, row))}</span></span></a>`).join('')}
+  ${code.length ? `<p class="sec">Coding · in your editor</p>
+  ${code.map(({ text, j }) => { const on = !!(st().done[i] || [])[j]; return `<button class="check ${on ? 'on' : ''}" data-act="tog" data-i="${i}" data-j="${j}"><span class="box">${on ? ico.tick : ''}</span><span class="tic">${tic.code}</span><span>${esc(cleanTask(text))}</span></button>`; }).join('')}` : ''}
   <div class="row" style="margin-top:14px"><button class="btn sm ghost" data-act="goto" data-v="${Math.max(0, i - 1)}" ${i === 0 ? 'disabled' : ''}>Previous</button><button class="btn sm ghost" data-act="goto" data-v="${Math.min(total - 1, i + 1)}" ${i >= total - 1 ? 'disabled' : ''}>Next day</button></div>`;
 }
 
@@ -185,8 +271,35 @@ function vDays() {
   <a class="card" href="#/guide" style="display:block;margin-top:12px"><b>Exam guide</b><p class="mu sm">Pattern, timing and what Prime actually tests.</p></a>`;
 }
 
+function vWork(i, j) {
+  const raw = material(i).k[j];
+  if (!raw) return `<a class="back" href="#/today">${ico.back} Today</a><h1>Missing task</h1>`;
+  const kind = activityKind(raw), back = (todayOff() === i ? '#/today' : '#/day/' + (i + 1));
+  const head = `<a class="back" href="${back}">${ico.back} Day ${i + 1}</a><h1 style="margin-top:8px">${esc(cleanTask(raw))}</h1>`;
+  const on = !!(st().done[i] || [])[j];
+  if (kind === 'study') {
+    const formulas = /formula/i.test(raw);
+    return `${head}<p class="sec">Focus</p><div class="note" style="margin-top:0">${esc(material(i).f)}</div><p class="sec">Today's plan</p><div class="card"><ul class="pts">${material(i).s.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>${formulas ? `<p class="sec">Formula sheet</p><div class="card"><ul class="pts">${FORMULAS.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : ''}<button class="btn" data-act="studied" data-i="${i}" data-j="${j}">${on ? 'Studied' : 'I have studied this'}</button>`;
+  }
+  if (kind === 'rest') return `${head}<p style="margin-top:12px">Stop for the night. Nothing else counts after this.</p><button class="btn" data-act="studied" data-i="${i}" data-j="${j}">${on ? 'Marked' : 'Done for tonight'}</button>`;
+  if (kind === 'check') {
+    const bits = workOf(i, j).padEnd(3, '0').slice(0, 3);
+    const items = ['Photo ID and admit card are with me', 'NextStep or iON login checked', 'Slot time and the section pattern checked'];
+    return `${head}<p class="mu sm" style="margin:8px 0 14px">All three ticks mark this done.</p>${items.map((it, n) => `<button class="check ${bits[n] === '1' ? 'on' : ''}" data-act="bit" data-i="${i}" data-j="${j}" data-n="${n}"><span class="box">${bits[n] === '1' ? ico.tick : ''}</span><span>${it}</span></button>`).join('')}`;
+  }
+  if (kind === 'recall') {
+    const p = PASSAGES[i % PASSAGES.length];
+    const hidden = st().hide && st().hide[i] && st().hide[i][j];
+    const v = workOf(i, j);
+    return `${head}<p class="mu sm" style="margin:8px 0 12px">Read it once, hide it, then rewrite from memory.</p>${hidden ? '' : `<div class="card"><b>${esc(p.t)}</b><p style="margin-top:8px">${esc(p.b)}</p></div><button class="btn" data-act="hide" data-i="${i}" data-j="${j}">Hide and write</button>`}<textarea data-work="${i}:${j}" placeholder="Rewrite the passage">${esc(v)}</textarea><p class="mu sm" id="wc">${writeStatus('recall', v)}</p>`;
+  }
+  const v = workOf(i, j);
+  const hint = kind === 'email' ? 'Greeting, why you are writing, the request, and a close. 80 words marks it done.' : kind === 'note' ? 'Three lines: what you did, what was slow, what you will repeat. 40 characters marks it done.' : 'Write the log, the misses, or the weak topics here. 20 characters marks it done.';
+  return `${head}<p class="mu sm" style="margin:8px 0 0">${hint}</p><textarea data-work="${i}:${j}" placeholder="Write here">${esc(v)}</textarea><p class="mu sm" id="wc">${writeStatus(kind, v)}</p>`;
+}
+
 function vQuiz(id, i) {
-  const name = id === 'apt' ? 'Aptitude' : 'Reasoning';
+  const name = { apt: 'Aptitude', rea: 'Reasoning', ver: 'Verbal', mix: 'Mixed set' }[id] || 'Assessment';
   const qs = quizOf(i, id);
   st().quiz = st().quiz || {};
   st().quiz[i] = st().quiz[i] || {};
@@ -226,7 +339,10 @@ function render(route) {
   else if (r === 'settings') { html = vSettings(); tab = 'settings'; }
   else if (r === 'quiz') {
     const i = Math.min(totalDays(), Math.max(1, parseInt(extra, 10) || 1)) - 1;
-    html = vQuiz(arg === 'rea' ? 'rea' : 'apt', i);
+    html = vQuiz(['rea', 'ver', 'mix'].includes(arg) ? arg : 'apt', i);
+  } else if (r === 'work') {
+    const i = Math.min(totalDays(), Math.max(1, parseInt(arg, 10) || 1)) - 1;
+    html = vWork(i, parseInt(extra, 10) || 0);
   } else if (r === 'day') {
     const n = Math.min(totalDays(), Math.max(1, parseInt(arg, 10) || 1));
     html = vToday(n - 1, true);
@@ -299,6 +415,20 @@ document.addEventListener('click', async e => {
     const i = +b.dataset.i, j = +b.dataset.j;
     const cur = material(i).k.map((_, k) => !!(st().done[i] && st().done[i][k]));
     cur[j] = !cur[j]; st().done[i] = cur;
+  } else if (a === 'studied') {
+    const i = +b.dataset.i, j = +b.dataset.j;
+    const cur = material(i).k.map((_, k) => !!(st().done[i] && st().done[i][k]));
+    cur[j] = !cur[j]; st().done[i] = cur;
+  } else if (a === 'bit') {
+    const i = +b.dataset.i, j = +b.dataset.j, n = +b.dataset.n;
+    st().work = st().work || {}; st().work[i] = st().work[i] || {};
+    const bits = (st().work[i][j] || '000').padEnd(3, '0').split('');
+    bits[n] = bits[n] === '1' ? '0' : '1';
+    st().work[i][j] = bits.join('');
+  } else if (a === 'hide') {
+    const i = +b.dataset.i, j = +b.dataset.j;
+    st().hide = st().hide || {}; st().hide[i] = st().hide[i] || {};
+    st().hide[i][j] = 1;
   } else if (a === 'ans') {
     const i = +b.dataset.i, id = b.dataset.s, q = +b.dataset.q;
     const qs = quizOf(i, id);
@@ -328,6 +458,13 @@ document.addEventListener('click', async e => {
 });
 document.addEventListener('input', e => {
   if (e.target.dataset.note != null) { st().notes[e.target.dataset.note] = e.target.value; save(); }
+  if (e.target.dataset.work) {
+    const [i, j] = e.target.dataset.work.split(':').map(Number);
+    st().work = st().work || {}; st().work[i] = st().work[i] || {};
+    st().work[i][j] = e.target.value; save();
+    const wc = document.getElementById('wc');
+    if (wc) wc.textContent = writeStatus(activityKind(material(i).k[j]), e.target.value);
+  }
 });
 document.addEventListener('change', e => {
   if (e.target.id === 'tm' && e.target.value) { S.time = e.target.value; save(); schedule(); toast('Reminder time updated'); }

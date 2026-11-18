@@ -50,7 +50,7 @@ const GEN = (() => {
 
   function quiz(id, date, dayNum) {
     const r = rng(hash(date + id));
-    if (id === 'ver') return shuffle(r, D.VER.map((_, i) => i)).slice(0, 5).map(i => fromBank(r, D.VER[i]));
+    if (id === 'ver') return shuffle(r, D.VER.map((_, i) => i)).slice(0, 8).map(i => fromBank(r, D.VER[i]));
     if (id === 'rea') {
       const out = [];
       for (let n = 0; n < 8; n++) out.push(REA[n % REA.length](r));
