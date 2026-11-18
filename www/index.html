@@ -9,7 +9,7 @@
 <link rel="icon" href="icon-192.png">
 <script>
 try {
-  const saved = JSON.parse(localStorage.getItem('nqt.daily.v1') || '{}');
+  const saved = JSON.parse(localStorage.getItem('nqt.plan.v1') || localStorage.getItem('nqt.daily.v1') || '{}');
   const dark = saved.theme === 'dark' || (saved.theme !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
 } catch (e) {}
@@ -21,6 +21,7 @@ try {
 <nav></nav>
 <script src="data.js"></script>
 <script src="gen.js"></script>
+<script src="plans.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

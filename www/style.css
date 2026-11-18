@@ -45,8 +45,18 @@ textarea{width:100%;min-height:90px;border:1px solid var(--ln);border-radius:14p
 [data-theme=dark] .l1{background:#33401a}[data-theme=dark] .l2{background:#4c6420}[data-theme=dark] .l3{background:#6f9426}[data-theme=dark] .l4{background:#98c82f}[data-theme=dark] .l5{background:#BEF264}
 .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}.stats .card b{display:block;font:500 28px ui-serif,Georgia,serif}
 .seg{display:flex;background:var(--sf2);border-radius:12px;padding:4px}.seg button{flex:1;border:0;background:none;color:var(--mu);padding:8px;border-radius:9px;font:600 14px inherit;cursor:pointer}
+.seg.plans{margin-bottom:4px}.seg.plans button{padding:8px 4px}
+.check{display:flex;align-items:flex-start;gap:12px;width:100%;text-align:left;border:1px solid var(--ln);background:var(--sf);color:var(--tx);border-radius:14px;padding:12px 14px;margin-bottom:8px;font:15px/1.4 inherit;cursor:pointer}
+.check .box{width:22px;height:22px;border-radius:7px;border:1.5px solid var(--ln);flex:none;display:grid;place-items:center;margin-top:1px}
+.check .box svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.tic{width:28px;height:28px;border-radius:8px;flex:none;display:grid;place-items:center;background:var(--sf2);color:var(--ac);margin-top:1px}
+.tic svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.check.on{background:var(--soft);border-color:transparent}.check.on .box{background:var(--lime);border-color:var(--lime);color:var(--ink)}
+.task.done .tic{background:var(--lime);color:var(--ink)}
+.task.todayline{border-color:var(--lime)}
+button:disabled{opacity:.4;cursor:default}
 .seg button.on{background:var(--sf);color:var(--tx);box-shadow:0 1px 2px rgba(0,0,0,.08)}
-input[type=time]{border:1px solid var(--ln);border-radius:10px;background:var(--sf);color:var(--tx);padding:8px 10px;font:16px inherit}
+input[type=time],input[type=date]{border:1px solid var(--ln);border-radius:10px;background:var(--sf);color:var(--tx);padding:8px 10px;font:16px inherit}
 .set{margin-bottom:12px}.set .row{margin-bottom:10px}
 nav{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;gap:6px;padding:8px 12px calc(8px + env(safe-area-inset-bottom));background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(14px);border-top:1px solid var(--ln)}
 nav a{flex:1;max-width:160px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px;border-radius:14px;color:var(--mu);font-size:12px;font-weight:600}

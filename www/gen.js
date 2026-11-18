@@ -51,8 +51,15 @@ const GEN = (() => {
   function quiz(id, date, dayNum) {
     const r = rng(hash(date + id));
     if (id === 'ver') return shuffle(r, D.VER.map((_, i) => i)).slice(0, 5).map(i => fromBank(r, D.VER[i]));
-    if (id === 'rea') return REA.map(g => g(r));
-    return shuffle(r, APT.map((_, i) => i)).slice(0, 5).map(i => APT[i](r));
+    if (id === 'rea') {
+      const out = [];
+      for (let n = 0; n < 8; n++) out.push(REA[n % REA.length](r));
+      return out;
+    }
+    const order = shuffle(r, APT.map((_, i) => i));
+    const out = [];
+    for (let n = 0; n < 8; n++) out.push(APT[order[n % order.length]](r));
+    return out;
   }
   return { quiz };
 })();
