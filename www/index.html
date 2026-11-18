@@ -7,6 +7,13 @@
 <title>NQT Daily</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
+<script>
+try {
+  const saved = JSON.parse(localStorage.getItem('nqt.daily.v1') || '{}');
+  const dark = saved.theme === 'dark' || (saved.theme !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+} catch (e) {}
+</script>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
